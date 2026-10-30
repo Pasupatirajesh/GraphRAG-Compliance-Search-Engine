@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# Global environment configurations to suppress the transition log noise
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # Define the isolated execution environments and commands
 jobs:
   run-pipeline-tests:
@@ -17,7 +21,7 @@ jobs:
     - name: Checkout Code Repository
       uses: actions/checkout@v4
 
-    # Step 2: Install and configure Python on the runner
+    # Step 2: Cleaned standard namespace syntax for Python setup
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
@@ -31,7 +35,5 @@ jobs:
 
     # Step 4: Execute your automated unit tests
     - name: Execute Automated Unit Tests
-      # Note: We run unit tests that don't call live OpenAI endpoints 
-      # to keep this pipeline secure and cost-free.
       run: |
         python -m unittest test_pipeline.py
