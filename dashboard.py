@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 from preprocessor import chunk_pdf_document
-from retreiver import ProductionHybridRetriever
+from retriever import ProductionHybridRetriever
 from orchestrator import app
 
 st.set_page_config(page_title="Self-Correcting GraphRAG Engine", layout="wide")

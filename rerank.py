@@ -6,7 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from state import RAGState
-from retreiver import ProductionHybridRetriever
+from retriever import ProductionHybridRetriever
 
 class QueryExpansion(BaseModel):
     variations: List[str] = Field(description="3 alternative search variations of the prompt targeting technical vocabulary.")
@@ -20,7 +20,11 @@ def query_rewriter_node(state: RAGState) -> Dict[str, Any]:
     ])
     
     result = (prompt | llm).invoke({"query": state["cleaned_query"]})
-    return {"rewritten_queries": result.variations}
+    return {
+        "rewritten_queries": result.variations,
+        # Circuit-breaker counter: bump once every time the loop re-enters the rewriter
+        "rewrite_attempts": state.get("rewrite_attempts", 0) + 1
+    }
 
 
 def retrieve_node(state: RAGState, config: RunnableConfig) -> Dict[str, Any]:

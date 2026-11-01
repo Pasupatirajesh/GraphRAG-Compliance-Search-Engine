@@ -14,7 +14,7 @@ else:
 
 # 2. Match your specific file naming schema
 from preprocessor import chunk_pdf_document
-from retreiver import ProductionHybridRetriever
+from retriever import ProductionHybridRetriever
 from orchestrator import app 
 
 # 3. Process your actual PDF files into clean, structural chunks

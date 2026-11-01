@@ -1,4 +1,4 @@
-# retreiver.py
+# retriever.py
 import os
 import chromadb
 from typing import List, Dict, Any

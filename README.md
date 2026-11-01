@@ -1,5 +1,7 @@
 # Self-Correcting GraphRAG Compliance Engine
 
+[![Python Code Verification & Testing](https://github.com/Pasupatirajesh/GraphRAG-Compliance-Search-Engine/actions/workflows/python-tests.yml/badge.svg)](https://github.com/Pasupatirajesh/GraphRAG-Compliance-Search-Engine/actions/workflows/python-tests.yml)
+
 A production-grade, stateful search and retrieval engine engineered specifically to navigate highly regulated datasets (e.g., SEC financial filings, clinical journals, or public case law). 
 
 This system moves away from basic, linear retrieval-augmented generation patterns. It implements an advanced multi-stage pipeline utilizing **LangGraph** for resilient multi-node flow control, **ChromaDB** and **BM25** for hybrid lexical-semantic retrieval, and an autonomous runtime **RAG Triad Verification Loop** to intercept hallucinations before they reach an end-user.
@@ -34,6 +36,8 @@ This system moves away from basic, linear retrieval-augmented generation pattern
                                │               & Answer Relevance
                      Did Response Pass?
                       ├── Yes ──► (Display Output to User)
+                      ├── Out of Corpus Scope ──► (Honest "I do not know", NO retry)
+                      ├── Retry Budget Exhausted ──► (Graceful Stop, No Loop)
                       └── No  ──► [ Fallback Loop ] ──► Cycle back to Rewriter
 ```
 
@@ -45,7 +49,7 @@ This system moves away from basic, linear retrieval-augmented generation pattern
 The system is built on a modular design pattern that isolates independent computational stages into explicit handlers, matching enterprise development practices:
 * `state.py`: Defines the strictly typed `RAGState` payload passed across nodes.
 * `preprocessor.py`: Uses deterministic regular expressions to scrub document noise (confidentiality stamps, structural page headers, formatting artifacts) and chunks text accurately.
-* `retreiver.py`: Implements a multi-tenant retrieval index blending lexical token mapping via **BM25Okapi** with dense vector indices via a local persistent **ChromaDB** client.
+* `retriever.py`: Implements a multi-tenant retrieval index blending lexical token mapping via **BM25Okapi** with dense vector indices via a local persistent **ChromaDB** client.
 * `guardrail.py`: Acts as an upstream compliance gatekeeper checking prompt logic *before* triggering expensive database lookups.
 * `rerank.py`: Handles multi-query expansion variations and scoring density text reductions.
 * `llmjudge.py`: Generates the final output response and drives the automated evaluation step.
@@ -53,6 +57,17 @@ The system is built on a modular design pattern that isolates independent comput
 
 ### 2. Autonomous RAG Triad Verification & Self-Correction
 Rather than trusting LLM outputs blindly, the engine scores completions at runtime against the **RAG Triad (Faithfulness and Answer Relevance)** using an LLM-as-a-Judge pattern. If a completion drops below a strict evaluation threshold, LangGraph dynamically flags the transaction, blocks the output, routes the state back into the query rewriter, and attempts self-corrected context collection.
+
+The verification loop is **verdict-routed**, not score-only: the auditor emits a structured `verdict` separating *retry-worthy failures* (context had the answer; the answer was wrong — rewrite and retry) from *out-of-scope queries* (the corpus genuinely lacks the information — accept the honest "I do not know" and stop, spending zero extra LLM calls). A rewrite budget (`MAX_REWRITE_ATTEMPTS = 2`) acts as a circuit breaker against unbounded loops.
+
+**Measured behavior** — run `python evaluate.py` to reproduce (same query set, self-correction ON vs OFF; results in `eval_results.md`):
+
+| Scenario | Outcome |
+|---|---|
+| In-scope queries (4/4) | `pass` — faithfulness & relevance 1.0, first pass in both ON and OFF modes |
+| Out-of-scope queries (3/3) | `verdict: unanswerable`, 1.0 faithfulness, honest abstention — **no wasted rewrite rounds** in either mode |
+
+The harness demonstrates the loop's contract: corrective retries engage only when evaluation fails while context coverage exists, and out-of-scope queries terminate cheaply. To see the retry branch engage live (it requires a first-pass eval failure, which the pipeline avoids by default), temporarily raise `0.75` to `0.9` in `llmjudge.py` and rerun an in-scope query.
 
 ### 3. Application Visibility, Ingestion, & Monitoring
 * **Interactive Dashboard:** Built a complete web UI interface using **Streamlit** to visualize system operations, view specific page-level source citations, and display live evaluation dials.

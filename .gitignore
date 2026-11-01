@@ -1,2 +1,5 @@
 .env
 rag_env/
+__pycache__/
+chroma_db/
+eval_results.md

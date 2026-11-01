@@ -21,3 +21,8 @@ class RAGState(TypedDict):
     faithfulness_score: float
     relevance_score: float
     evaluation_passed: bool
+    # Diagnosis: why the answer missed (drives router retry vs. stop)
+    context_coverage: str   # "covered" | "missing"
+    verdict: str            # "pass" | "retry" | "unanswerable"
+    # Circuit breaker: how many times the loop has cycled back to the rewriter
+    rewrite_attempts: int

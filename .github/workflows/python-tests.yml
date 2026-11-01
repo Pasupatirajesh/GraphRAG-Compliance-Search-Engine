@@ -27,11 +27,12 @@ jobs:
       with:
         python-version: '3.11'
 
-    # Step 3: Install your project dependency stack
-    - name: Install Project Dependencies
+    # Step 3: Install the exact pinned dependency stack from requirements.txt.
+    # Unpinned installs drift over time; pinned installs keep the badge honest.
+    - name: Install Pinned Project Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install langgraph langchain langchain-openai rank-bm25 pydantic pypdf chromadb python-dotenv streamlit
+        pip install -r requirements.txt
 
     # Step 4: Execute your automated unit tests
     - name: Execute Automated Unit Tests
