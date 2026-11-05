@@ -7,7 +7,9 @@
 # rather than asserted.
 
 import os
+import sys
 import time
+import argparse
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -31,6 +33,21 @@ EVAL_QUERY_SET = [
     {"text": "Write me a recursive quicksort in Python.", "expectation": "out-of-scope (code-generation request)"},
 ]
 
+def load_query_set(path):
+    """Load a pip-separated query spec (query|expectation|category) from a
+    text file, skipping blanks and # comments. See sec_eval_queries.txt."""
+
+    entries = []
+    for line in open(path):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        text, expectation = parts[0], parts[1]
+        category = parts[2] if len(parts) > 2 else ""
+        entries.append({"text": text, "expectation": expectation, "category": category})
+    return entries
+
 def run_one(query, index, self_correction):
     config = {
         "configurable": {
@@ -51,12 +68,21 @@ def run_one(query, index, self_correction):
     }
 
 def main():
-    print("Building evaluation index...")
-    chunks = chunk_pdf_document("attention.pdf")
+    parser = argparse.ArgumentParser(description="A/B evaluation harness for the GraphRAG engine")
+    parser.add_argument("--queries", default=None,
+                        help="pip-separated query spec file (query|expectation|category); defaults to the built-in attention-paper set")
+    parser.add_argument("--pdf", default="attention.pdf",
+                        help="PDF to chunk and index for the run")
+    args = parser.parse_args()
+
+    query_set = load_query_set(args.queries) if args.queries else EVAL_QUERY_SET
+
+    print(f"Building evaluation index from {args.pdf}...")
+    chunks = chunk_pdf_document(args.pdf)
     index = ProductionHybridRetriever(chunks)
 
     rows = []
-    for spec in EVAL_QUERY_SET:
+    for spec in query_set:
         for mode in (True, False):
             label = "ON " if mode else "OFF"
             print(f"  ▪ [{'correction ' + label}] {spec['text']}")
@@ -83,7 +109,8 @@ def main():
     table = "\n".join(lines)
     with open("eval_results.md", "w") as fh:
         fh.write("# Mini Evaluation: Self-Correction ON vs OFF\n\n")
-        fh.write("Same query set, same corpus (attention.pdf), two graph configurations.\n\n")
+        fh.write(f"Corpus: `{args.pdf}` ({len(chunks)} chunks). ")
+        fh.write("Query set: " + (f"`{args.queries}`" if args.queries else "built-in demo set") + ".\n\n")
         fh.write(table + "\n")
     print("\n✅ Results written to eval_results.md:\n")
     print(table)

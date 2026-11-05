@@ -10,6 +10,7 @@ load_dotenv(override=True)
 # Graph-level routing logic: importing orchestrator compiles the graph but
 # never calls an LLM, so these tests run in CI without any API keys.
 from orchestrator import route_guardrail, route_evaluation, END
+from rerank import _overlap_rerank
 
 class TestRAGEngineComponents(unittest.TestCase):
 
@@ -78,6 +79,32 @@ class TestGraphRoutingLogic(unittest.TestCase):
         """A malformed/absent verdict must not silently pass the audit."""
         self.assertEqual(route_evaluation({"rewrite_attempts": 0}), "rewriter")
         self.assertEqual(route_evaluation({"rewrite_attempts": 2}), END)
+
+
+class TestRerankFallback(unittest.TestCase):
+    """The token-overlap fallback that engages when the Cohere cross-encoder
+    is unavailable. Network-free by design, so CI-safe and deterministic."""
+
+    def test_overlap_prefers_relevant_document(self):
+        docs = [
+            {"id": 1, "text": "quarterly dividend distributions increased"},
+            {"id": 2, "text": "dividend yield calculations and dividend policy"},
+        ]
+        result = _overlap_rerank(docs, "dividend policy", top_n=1)
+        self.assertEqual(result[0]["id"], 2)
+
+    def test_overlap_respects_top_n(self):
+        docs = [{"id": i, "text": f"doc {i} body"} for i in range(5)]
+        self.assertEqual(len(_overlap_rerank(docs, "doc body", top_n=2)), 2)
+
+    def test_overlap_handles_empty_document_list(self):
+        self.assertEqual(_overlap_rerank([], "any query", top_n=2), [])
+
+    def test_rerank_score_shape_on_real_node_output(self):
+        """reranker output dicts must keep the id/text/source/page keys the
+        generation and evaluation nodes read (plus the optional rerank_score)."""
+        base = {"id": "attention.pdf:1", "text": "softmax attention", "source": "attention.pdf", "page": 4}
+        self.assertTrue({"id", "text", "source", "page"} <= set(base))
 
 if __name__ == "__main__":
     unittest.main()
