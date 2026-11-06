@@ -50,29 +50,62 @@ if st.button("Execute Compliance Search Run") and user_query:
                 st.error("❌ Upstream Compliance Security Intercept Alert!")
                 st.warning(f"**Reason for rejection:** {final_state.get('safety_feedback')}")
             else:
-                st.success("✅ Security Checks Passed. Synthesis Context Extracted.")
-                
-                # Split layout into interactive insight columns
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    st.subheader("📝 Generated Output Validation Synthesis")
+                # Gate the display on the evaluator's final verdict, not just the
+                # safety gate — otherwise a non-compliant generation (LLM answering
+                # outside its context, e.g. writing quicksort from thin air) is
+                # presented as a green "success" even after the Triad audit fails it.
+                verdict = final_state.get("verdict") or "pass"
+                rounds = final_state.get("rewrite_attempts", 0)
+
+                if verdict == "pass":
+                    st.success("✅ Security Checks Passed. Triad audit passed. Synthesis Context Extracted.")
+
+                    # Split layout into interactive insight columns
+                    col1, col2 = st.columns([2, 1])
+
+                    with col1:
+                        st.subheader("📝 Generated Output Validation Synthesis")
+                        st.markdown(final_state.get("generation"))
+
+                        st.subheader("📚 Dynamic Citation Chunks Fetched")
+                        for doc in final_state.get("reranked_documents", []):
+                            # Show the cross-encoder score when Cohere rerank served this run
+                            rerank_note = f" | 🎯 Rerank score: {doc['rerank_score']:.3f}" if doc.get("rerank_score") is not None else ""
+                            with st.expander(f"📖 Source: {doc['source']} | Page Reference: {doc['page']}{rerank_note}"):
+                                st.write(doc['text'])
+
+                    with col2:
+                        st.subheader("📊 RAG Triad Audit Scores")
+
+                        # Present Metric Dashcards beautifully
+                        st.metric(label="Faithfulness (Anti-Hallucination)", value=f"{final_state.get('faithfulness_score') * 100:.1f}%")
+                        st.metric(label="Answer Relevance Profile", value=f"{final_state.get('relevance_score') * 100:.1f}%")
+
+                        if final_state.get("evaluation_passed"):
+                            st.balloons()
+                            st.success("🏆 Verification Verdict: Response fully grounded and safe to display.")
+                        else:
+                            st.error("⚠️ Verification Verdict: Hallucination or low-relevance threshold hit.")
+
+                elif verdict == "unanswerable":
+                    # The corpus genuinely lacks the information. The honest
+                    # abstention IS the correct outcome — present it as intended,
+                    # not as a failure, and spend no rewrite display noise.
+                    st.warning("🟡 Query is out of scope for this corpus. The pipeline answered honestly instead of generating.")
+                    st.subheader("📝 Honest Abstention")
                     st.markdown(final_state.get("generation"))
-                    
-                    st.subheader("📚 Dynamic Citation Chunks Fetched")
-                    for doc in final_state.get("reranked_documents", []):
-                        with st.expander(f"📖 Source: {doc['source']} | Page Reference: {doc['page']}"):
-                            st.write(doc['text'])
-                
-                with col2:
-                    st.subheader("📊 RAG Triad Audit Scores")
-                    
-                    # Present Metric Dashcards beautifully
-                    st.metric(label="Faithfulness (Anti-Hallucination)", value=f"{final_state.get('faithfulness_score') * 100:.1f}%")
-                    st.metric(label="Answer Relevance Profile", value=f"{final_state.get('relevance_score') * 100:.1f}%")
-                    
-                    if final_state.get("evaluation_passed"):
-                        st.balloons()
-                        st.success("🏆 Verification Verdict: Response fully grounded and safe to display.")
-                    else:
-                        st.error("⚠️ Verification Verdict: Hallucination or low-relevance threshold hit.")
+                    st.caption(f"Context coverage: {final_state.get('context_coverage') or 'missing'} · Rewrite rounds: {rounds} · Zero wasted LLM rounds by verdict routing.")
+
+                else:
+                    # verdict == "retry" reaching here means the rewrite budget
+                    # was exhausted: evaluation kept failing, so the last answer
+                    # is withheld as a failed audit, never a green success.
+                    st.error("🛑 Quality audit failed after exhausting the rewrite budget. Answer withheld.")
+                    st.caption(
+                        f"Rewrite rounds: {rounds} · "
+                        f"Faithfulness: {final_state.get('faithfulness_score')} · "
+                        f"Relevance: {final_state.get('relevance_score')} · "
+                        f"Context coverage: {final_state.get('context_coverage') or 'n/a'}"
+                    )
+                    with st.expander("🔍 Technical detail (last withheld candidate answer)"):
+                        st.markdown(final_state.get("generation"))
