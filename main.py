@@ -8,7 +8,10 @@ from logger_utils import log_rag_transaction
 load_dotenv(override=True)
 
 if not os.getenv("OPENAI_API_KEY"):
-    raise ValueError("❌ Initialization Failed: OPENAI_API_KEY is missing from your environment setup.")
+    raise ValueError(
+        "❌ Initialization Failed: OPENAI_API_KEY is missing.\n"
+        "Copy sample.env to .env in the project root and fill in your keys — or export them, e.g. `export OPENAI_API_KEY=...`."
+    )
 else:
     print("✅ System Environment Configurations Loaded Successfully.")
 

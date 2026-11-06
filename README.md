@@ -111,6 +111,15 @@ Place a target document (e.g., a **Form 10-K PDF** like the bundled `aapl.pdf`, 
 ```bash
 streamlit run dashboard.py
 ```
+
+### 4. Run in Docker
+The image carries no credentials — API keys are supplied at runtime, exactly as they would be in production:
+```bash
+cp sample.env .env    # fill in OPENAI_API_KEY (required) and COHERE_API_KEY (optional)
+docker build -t graphrag-engine .
+docker run --rm -p 8501:8501 --env-file .env graphrag-engine
+```
+Then open http://localhost:8501. Without keys, the app fails professionally with guided setup instructions rather than a stack trace. A container build runs on every push as part of CI.
 ---
 
 ## 📈 Sample Execution Output Trace

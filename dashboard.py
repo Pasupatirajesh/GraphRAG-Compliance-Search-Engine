@@ -11,6 +11,26 @@ from retriever import ProductionHybridRetriever
 from orchestrator import app
 
 st.set_page_config(page_title="Self-Correcting GraphRAG Engine", layout="wide")
+
+# Tier-2 guard: fail professionally instead of a raw traceback when the user
+# forgot their keys (e.g. first `docker run` without --env-file .env).
+_required_keys = [
+    ("OPENAI_API_KEY", "REQUIRED — powers embeddings, generation, and the evaluation auditor"),
+    ("COHERE_API_KEY", "optional — enables the Cohere Rerank 5 stage (falls back to lexical scoring without it)"),
+]
+_missing = [(k, note) for k, note in _required_keys if not os.getenv(k)]
+
+if any(k == "OPENAI_API_KEY" for k, _ in _missing):
+    st.error("⚠️ **API keys required before this app can start.**")
+    st.markdown(
+        "Copy the bundled `sample.env` to `.env` in the project root and fill in your keys:\n\n"
+        "```bash\ncp sample.env .env   # then edit .env\n```\n"
+        "When running the Docker image: `docker run -p 8501:8501 --env-file .env graphrag-engine`"
+    )
+    with st.expander("Key status"):
+        st.markdown("\n".join(f"**{k}** — {note}" for k, note in _required_keys))
+    st.stop()
+
 st.title("🛡️ Enterprise GraphRAG Compliance Search Engine")
 st.caption("Powered by LangGraph, ChromaDB, and Real-Time RAG Triad Alignment Verification Loop.")
 

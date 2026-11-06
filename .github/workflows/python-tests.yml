@@ -38,3 +38,14 @@ jobs:
     - name: Execute Automated Unit Tests
       run: |
         python -m unittest test_pipeline.py
+
+  # Container build gate: the deliverable must at minimum assemble on every push.
+  # Build-only (no registry push) — publishing an image is a release action, not a test.
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code Repository
+      uses: actions/checkout@v4
+
+    - name: Build Container Image
+      run: docker build -t graphrag-engine:${{ github.sha }} .

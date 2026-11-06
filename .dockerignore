@@ -1,0 +1,12 @@
+.env
+rag_env/
+.venv/
+__pycache__/
+chroma_db/
+*.jsonl
+.git/
+.github/
+.DS_Store
+langgraph-learning-path.txt
+sec_eval_queries.txt
+test_pipeline.py
