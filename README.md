@@ -51,7 +51,7 @@ The system is built on a modular design pattern that isolates independent comput
 * `preprocessor.py`: Uses deterministic regular expressions to scrub document noise (confidentiality stamps, structural page headers, formatting artifacts) and chunks text accurately.
 * `retriever.py`: Implements a multi-tenant retrieval index blending lexical token mapping via **BM25Okapi** with dense vector indices via a local persistent **ChromaDB** client.
 * `guardrail.py`: Acts as an upstream compliance gatekeeper checking prompt logic *before* triggering expensive database lookups.
-* `rerank.py`: Handles multi-query expansion variations and scoring density text reductions.
+* `rerank.py`: Handles multi-query expansion variations, coarse candidate shortlisting, and precision reranking via the **Cohere Rerank 5 cross-encoder** (fail-open token-overlap fallback included).
 * `llmjudge.py`: Generates the final output response and drives the automated evaluation step.
 * `orchestrator.py`: Compiles the stateful multi-node **LangGraph** execution workflow.
 
@@ -107,7 +107,7 @@ OPENAI_API_KEY=sk-proj-yourActualSecretKeyGoesHere
 ```
 
 ### 3. Ingest and Run the UI Dashboard
-Place a target regulatory document snippet (e.g., `sec_filing_sample.pdf`) into your root directory, then execute the interface application:
+Place a target document (e.g., a **Form 10-K PDF** like the bundled `aapl.pdf`, or `attention.pdf`) into your root directory, then execute the interface application:
 ```bash
 streamlit run dashboard.py
 ```
@@ -117,19 +117,22 @@ streamlit run dashboard.py
 
 ```text
 ✅ System Environment Configurations Loaded Successfully.
-📦 Successfully processed 'sec_filing_sample.pdf': Extracted 12 text fragments.
+📦 Successfully processed 'aapl.pdf': Extracted 84 text fragments.
 💾 Populating persistent Chroma collection with document vectors...
-✅ Successfully indexed 12 vectors permanently to disk.
+✅ Successfully indexed 84 vectors permanently to disk.
+(Re-runs reuse the persisted, corpus-fingerprinted collection and skip re-embedding entirely.)
+🎯 Cohere rerank-v5.0-fast: reranked 8 candidates -> 2 passages
 
 ==========================================
-🚀 Processing Query: 'What are Section 404 baseline structural compliance constraints?'
+🚀 Processing Query: 'What was the company's total net sales for the most recent fiscal year?'
 ==========================================
 
 ✅ Query Processed Successfully.
 📝 Final Answer:
-Section 404 compliance mandates continuous structural logging of validation and internal reporting protocols...
+The company's total net sales for the most recent fiscal year, 2026, were $478,834 million.
 
 📊 Quality Audit Matrix:
    - Faithfulness (Anti-Hallucination) Score: 1.0
    - Answer Relevance Score: 1.0
+   - Verification Verdict: pass
 ```
